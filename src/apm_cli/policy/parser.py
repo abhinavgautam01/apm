@@ -208,11 +208,18 @@ def _build_policy(data: dict) -> ApmPolicy:
         require_explicit_includes=bool(manifest_data.get("require_explicit_includes", False)),
     )
 
-    uf_data = data.get("unmanaged_files") or {}
-    unmanaged_files = UnmanagedFilesPolicy(
-        action=uf_data.get("action", UnmanagedFilesPolicy.action),
-        directories=_parse_tuple(uf_data.get("directories")),
-    )
+    raw_uf = data.get("unmanaged_files")
+    if raw_uf is None:
+        unmanaged_files = UnmanagedFilesPolicy(action=None, directories=None)
+    else:
+        uf_data = {} if not isinstance(raw_uf, dict) else raw_uf
+        action = uf_data.get("action")
+        directories = (
+            _parse_tuple(uf_data.get("directories"))
+            if "directories" in uf_data
+            else None
+        )
+        unmanaged_files = UnmanagedFilesPolicy(action=action, directories=directories)
 
     return ApmPolicy(
         name=data.get("name", "") or "",

@@ -218,6 +218,8 @@ class TestLoadPolicyFromString(unittest.TestCase):
         self.assertIsNone(policy.dependencies.allow)
         self.assertEqual(policy.dependencies.max_depth, 50)
         self.assertFalse(policy.manifest.require_explicit_includes)
+        self.assertIsNone(policy.unmanaged_files.action)
+        self.assertIsNone(policy.unmanaged_files.directories)
 
     def test_require_explicit_includes_true(self):
         yaml_str = textwrap.dedent("""

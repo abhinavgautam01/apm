@@ -96,8 +96,8 @@ class TestUnmanagedFilesPolicyDefaults(unittest.TestCase):
 
     def test_defaults(self):
         uf = UnmanagedFilesPolicy()
-        self.assertEqual(uf.action, "ignore")
-        self.assertEqual(uf.directories, ())
+        self.assertIsNone(uf.action)
+        self.assertIsNone(uf.directories)
 
 
 class TestApmPolicyDefaults(unittest.TestCase):

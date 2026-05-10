@@ -424,6 +424,33 @@ class TestUnmanagedFilesMerge(unittest.TestCase):
         )
         self.assertEqual(result.unmanaged_files.directories, (".prompts",))
 
+    def test_child_omitting_unmanaged_files_inherits_parent_issue_1198(self):
+        """extends: child without unmanaged_files must not downgrade org deny."""
+        parent = ApmPolicy(
+            unmanaged_files=UnmanagedFilesPolicy(
+                action="deny",
+                directories=(
+                    ".github/instructions",
+                    ".github/agents",
+                    ".github/hooks",
+                ),
+            ),
+        )
+        child = ApmPolicy(
+            dependencies=DependencyPolicy(deny=("**/some-pattern",)),
+            unmanaged_files=UnmanagedFilesPolicy(action=None, directories=None),
+        )
+        result = merge_policies(parent, child)
+        self.assertEqual(result.unmanaged_files.action, "deny")
+        self.assertEqual(
+            result.unmanaged_files.directories,
+            (
+                ".github/instructions",
+                ".github/agents",
+                ".github/hooks",
+            ),
+        )
+
 
 class TestResolvePolicyChain(unittest.TestCase):
     """Full chain resolution with three levels."""
