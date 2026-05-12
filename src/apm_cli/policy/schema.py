@@ -104,6 +104,11 @@ class UnmanagedFilesPolicy:
     action: str | None = None  # None | ignore | warn | deny
     directories: tuple[str, ...] | None = None  # None -> no opinion; () explicit
 
+    @property
+    def effective_action(self) -> str:
+        """Resolved action for runtime checks (None -> 'ignore')."""
+        return self.action if self.action is not None else "ignore"
+
 
 @dataclass(frozen=True)
 class ApmPolicy:
