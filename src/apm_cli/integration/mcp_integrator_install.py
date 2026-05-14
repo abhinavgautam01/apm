@@ -198,9 +198,7 @@ def run_mcp_install(
                 except (ValueError, ImportError):
                     continue
         except ImportError:
-            installed_runtimes = [
-                rt for rt in ["copilot", "codex"] if shutil.which(rt) is not None
-            ]
+            installed_runtimes = [rt for rt in ["copilot", "codex"] if shutil.which(rt) is not None]
             # VS Code: check binary on PATH or .vscode/ directory presence
             if _is_vscode_available(project_root=project_root_path):
                 installed_runtimes.append("vscode")
@@ -241,9 +239,7 @@ def run_mcp_install(
                         )
                     console.print("|")
                 else:
-                    logger.verbose_detail(
-                        f"Installed runtimes: {', '.join(installed_runtimes)}"
-                    )
+                    logger.verbose_detail(f"Installed runtimes: {', '.join(installed_runtimes)}")
                     logger.verbose_detail(f"Script runtimes: {', '.join(script_runtimes)}")
                     if target_runtimes:
                         logger.verbose_detail(f"Target runtimes: {', '.join(target_runtimes)}")
@@ -270,8 +266,7 @@ def run_mcp_install(
         # All runtimes excluded  -- nothing to configure
         if not target_runtimes and installed_runtimes:
             logger.warning(
-                f"All installed runtimes excluded (--exclude {exclude}), "
-                "skipping MCP configuration"
+                f"All installed runtimes excluded (--exclude {exclude}), skipping MCP configuration"
             )
             return 0
 
@@ -341,9 +336,7 @@ def run_mcp_install(
             logger.mcp_lookup_heartbeat(len(registry_dep_names))
             if verbose:
                 logger.verbose_detail(f"Validating {len(registry_deps)} registry servers...")
-            valid_servers, invalid_servers = operations.validate_servers_exist(
-                registry_dep_names
-            )
+            valid_servers, invalid_servers = operations.validate_servers_exist(registry_dep_names)
 
             if invalid_servers:
                 logger.error(f"Server(s) not found in registry: {', '.join(invalid_servers)}")
@@ -374,9 +367,7 @@ def run_mcp_install(
                     )
                     if drifted:
                         servers_to_update.update(drifted)
-                        MCPIntegrator._append_drifted_to_install_list(
-                            servers_to_install, drifted
-                        )
+                        MCPIntegrator._append_drifted_to_install_list(servers_to_install, drifted)
                 already_configured_servers = [
                     dep for dep in already_configured_candidates if dep not in servers_to_update
                 ]
@@ -404,9 +395,7 @@ def run_mcp_install(
 
                     # Batch fetch server info once
                     if verbose:
-                        logger.verbose_detail(
-                            f"Installing {len(servers_to_install)} servers..."
-                        )
+                        logger.verbose_detail(f"Installing {len(servers_to_install)} servers...")
                     server_info_cache = operations.batch_fetch_server_info(servers_to_install)
 
                     # Apply overlays
@@ -476,13 +465,11 @@ def run_mcp_install(
     # --- Self-defined deps (registry: false) ---
     if self_defined_deps:
         self_defined_names = [dep.name for dep in self_defined_deps]
-        self_defined_to_install = (
-            MCPIntegrator._check_self_defined_servers_needing_installation(
-                self_defined_names,
-                target_runtimes,
-                project_root=project_root,
-                user_scope=user_scope,
-            )
+        self_defined_to_install = MCPIntegrator._check_self_defined_servers_needing_installation(
+            self_defined_names,
+            target_runtimes,
+            project_root=project_root,
+            user_scope=user_scope,
         )
         already_configured_candidates_sd = [
             name for name in self_defined_names if name not in self_defined_to_install
@@ -499,9 +486,7 @@ def run_mcp_install(
             )
             if drifted_sd:
                 servers_to_update.update(drifted_sd)
-                MCPIntegrator._append_drifted_to_install_list(
-                    self_defined_to_install, drifted_sd
-                )
+                MCPIntegrator._append_drifted_to_install_list(self_defined_to_install, drifted_sd)
         already_configured_self_defined = [
             name for name in already_configured_candidates_sd if name not in servers_to_update
         ]
@@ -529,8 +514,7 @@ def run_mcp_install(
                 transport_label = dep.transport or "stdio"
                 action_text = "Updating" if is_update else "Configuring"
                 console.print(
-                    f"|  [cyan]>[/cyan]  {dep.name} "
-                    f"[dim](self-defined, {transport_label})[/dim]"
+                    f"|  [cyan]>[/cyan]  {dep.name} [dim](self-defined, {transport_label})[/dim]"
                 )
                 console.print(
                     f"|     +- {action_text} for "
