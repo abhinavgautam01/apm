@@ -143,7 +143,14 @@ def validate_policy(data: dict) -> tuple[list[str], list[str]]:
     # unmanaged_files
     uf = data.get("unmanaged_files")
     if uf is not None and not isinstance(uf, dict):
-        errors.append("unmanaged_files must be a YAML mapping")
+        errors.append(
+            "unmanaged_files must be a YAML mapping "
+            f"(got {type(uf).__name__} {uf!r}); use a block, for example:\n"
+            "  unmanaged_files:\n"
+            "    action: deny\n"
+            "    directories:\n"
+            "      - .github/instructions"
+        )
     elif isinstance(uf, dict):
         action = uf.get("action")
         if action is not None and action not in _VALID_UNMANAGED_ACTION:
