@@ -216,11 +216,7 @@ def _build_policy(data: dict) -> ApmPolicy:
     else:
         uf_data = raw_uf
         action = uf_data.get("action")
-        directories = (
-            _parse_tuple(uf_data.get("directories"))
-            if "directories" in uf_data
-            else None
-        )
+        directories = _parse_tuple(uf_data.get("directories")) if "directories" in uf_data else None
         unmanaged_files = UnmanagedFilesPolicy(action=action, directories=directories)
 
     return ApmPolicy(
