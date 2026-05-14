@@ -19,14 +19,21 @@
 #   irm https://.../install.ps1 | iex
 #
 # Private repositories: set GITHUB_APM_PAT or GITHUB_TOKEN
+#
+# Pinned installs require a .sha256 sidecar unless you opt out:
+#   $env:APM_SKIP_CHECKSUM = '1'   # or: .\install.ps1 v1.2.3 -SkipChecksum
 
 param(
     [Parameter(Position = 0)]
     [string]$Version = $null,
-    [string]$Repo = "microsoft/apm"
+    # Prefer $env:APM_REPO; -Repo remains for direct script invocation.
+    [string]$Repo = "microsoft/apm",
+    [switch]$SkipChecksum
 )
 
 $ErrorActionPreference = "Stop"
+
+$skipChecksum = $SkipChecksum -or ($env:APM_SKIP_CHECKSUM -eq '1')
 
 # ---------------------------------------------------------------------------
 # Configuration (overridable via environment variables - parity with install.sh)
@@ -37,23 +44,34 @@ $githubUrl = if ($env:GITHUB_URL) {
 } else {
     "https://github.com"
 }
+if ($githubUrl -notmatch '(?i)^https://') {
+    Write-Host "GITHUB_URL must use an https:// URL." -ForegroundColor Red
+    exit 1
+}
+
 $apmRepo = if ($env:APM_REPO) { $env:APM_REPO.Trim() } else { $Repo }
+if ($apmRepo -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') {
+    Write-Host "APM_REPO must be owner/name (letters, digits, ._- only)." -ForegroundColor Red
+    exit 1
+}
 
 $pinnedVersion = $null
 if ($env:VERSION) {
     $pinnedVersion = $env:VERSION.Trim().TrimStart('@')
 } elseif ($Version) {
     $pinnedVersion = $Version.Trim().TrimStart('@')
-} elseif ($args.Count -gt 0) {
-    $a0 = [string]$args[0]
-    $pinnedVersion = $a0.Trim().TrimStart('@')
+}
+if ($pinnedVersion -and $pinnedVersion -notmatch '^v?[0-9]+\.[0-9]+') {
+    Write-Host "VERSION must look like a release tag (for example v1.2.3 or 1.2.3)." -ForegroundColor Red
+    exit 1
 }
 
 $defaultInstallRoot = Join-Path $env:LOCALAPPDATA "Programs\apm"
 $defaultBinDir = Join-Path $defaultInstallRoot "bin"
 
 if ($env:APM_INSTALL_DIR) {
-    $binDir = $env:APM_INSTALL_DIR.Trim().TrimEnd('\', '/')
+    $rawBinDir = $env:APM_INSTALL_DIR.Trim().TrimEnd('\', '/')
+    $binDir = [System.IO.Path]::GetFullPath($rawBinDir)
     $parent = Split-Path $binDir -Parent
     if ($parent) {
         $installRoot = $parent
@@ -77,7 +95,7 @@ $assetName = "apm-windows-x86_64.zip"
 function Get-GitHubApiRoot {
     param([string]$Url)
     $u = $Url.Trim().TrimEnd('/')
-    if ($u -match '(?i)^https?://github\.com$') {
+    if ($u -match '(?i)^https://github\.com$') {
         return "https://api.github.com"
     }
     return "$u/api/v3"
@@ -104,6 +122,7 @@ function Write-ErrorText {
 }
 
 function Get-AuthHeader {
+    # For GHES, use a PAT issued on that host (github.com tokens often will not work).
     if ($env:GITHUB_APM_PAT) {
         return @{ Authorization = "token $($env:GITHUB_APM_PAT)" }
     }
@@ -249,7 +268,6 @@ $tagName = $null
 if ($pinnedVersion) {
     $tagName = $pinnedVersion
     Write-Success "Version: $tagName (pinned - skipping releases/latest API)"
-    Write-Info "Download base: $githubUrl/$apmRepo/releases/download/$tagName/"
 } else {
     Write-Info "Fetching latest release information..."
     $latestUri = "$apiRoot/repos/$apmRepo/releases/latest"
@@ -311,22 +329,32 @@ try {
     $directUrl = "$githubUrl/$apmRepo/releases/download/$tagName/$assetName"
 
     if ($pinnedVersion) {
+        $pinDownloadErr = $null
         try {
             Invoke-WebRequest -Uri $directUrl -OutFile $zipPath -UseBasicParsing
             $downloadOk = $true
             Write-Success "Download successful"
         } catch {
+            $pinDownloadErr = $_.Exception.Message
             Write-WarningText "Unauthenticated download failed, retrying with authentication..."
         }
         if (-not $downloadOk) {
             if ($headers.Count -eq 0) { $headers = Get-AuthHeader }
-            if ($headers.Count -gt 0) {
-                try {
-                    Invoke-WebRequest -Uri $directUrl -Headers $headers -OutFile $zipPath -UseBasicParsing
-                    $downloadOk = $true
-                    Write-Success "Download successful with authentication"
-                } catch {
+            if ($headers.Count -eq 0) {
+                Write-ErrorText "Repository may be private but no authentication token found."
+                Write-Host "Set GITHUB_APM_PAT or GITHUB_TOKEN and retry."
+                if ($pinDownloadErr) {
+                    Write-Host "Details: $pinDownloadErr"
                 }
+                Write-ManualInstallHelp -GithubUrl $githubUrl -ApmRepo $apmRepo
+                exit 1
+            }
+            try {
+                Invoke-WebRequest -Uri $directUrl -Headers $headers -OutFile $zipPath -UseBasicParsing
+                $downloadOk = $true
+                Write-Success "Download successful with authentication"
+            } catch {
+                Write-WarningText "Authenticated download failed: $($_.Exception.Message)"
             }
         }
     } else {
@@ -382,7 +410,7 @@ try {
     }
 
     # ------------------------------------------------------------------
-    # Verify checksum (if .sha256 file is available)
+    # Verify checksum (pinned installs require .sha256 unless skipped)
     # ------------------------------------------------------------------
 
     $sha256AssetName = "$assetName.sha256"
@@ -394,7 +422,11 @@ try {
         if ($shaObj) { $sha256Source = $shaObj }
     }
 
-    if ($sha256Source -or $pinnedVersion) {
+    $checksumRequired = [bool]($pinnedVersion -and -not $skipChecksum)
+
+    if ($skipChecksum -and $pinnedVersion) {
+        Write-WarningText "Skipping checksum verification (APM_SKIP_CHECKSUM or -SkipChecksum)."
+    } elseif ($sha256Source -or $pinnedVersion) {
         Write-Info "Verifying download checksum..."
         $sha256Path = Join-Path $tempDir $sha256AssetName
         $fetched = $false
@@ -427,11 +459,29 @@ try {
                     if ($headers.Count -gt 0) {
                         Invoke-WebRequest -Uri $sha256Url -Headers $headers -OutFile $sha256Path -UseBasicParsing
                         $fetched = $true
+                    } else {
+                        throw
                     }
                 }
             }
         } catch {
+            if ($checksumRequired) {
+                Write-ErrorText "Could not download checksum file for pinned install."
+                Write-Host "$_"
+                Write-Host "Expected: $sha256Url"
+                Write-Host "To bypass integrity verification (emergency only), set APM_SKIP_CHECKSUM=1 or pass -SkipChecksum."
+                Write-ManualInstallHelp -GithubUrl $githubUrl -ApmRepo $apmRepo
+                exit 1
+            }
             Write-WarningText "Could not download checksum file (non-fatal): $_"
+        }
+
+        if ($checksumRequired -and -not $fetched) {
+            Write-ErrorText "Pinned install requires the release .sha256 file next to the zip."
+            Write-Host "Expected: $sha256Url"
+            Write-Host "To bypass integrity verification (emergency only), set APM_SKIP_CHECKSUM=1 or pass -SkipChecksum."
+            Write-ManualInstallHelp -GithubUrl $githubUrl -ApmRepo $apmRepo
+            exit 1
         }
 
         if ($fetched -and (Test-Path $sha256Path)) {
@@ -449,8 +499,18 @@ try {
                 }
                 Write-Success "Checksum verified"
             } catch {
+                if ($checksumRequired) {
+                    Write-ErrorText "Checksum verification failed: $_"
+                    Write-ManualInstallHelp -GithubUrl $githubUrl -ApmRepo $apmRepo
+                    exit 1
+                }
                 Write-WarningText "Could not verify checksum (non-fatal): $_"
             }
+        } elseif ($checksumRequired) {
+            Write-ErrorText "Checksum file missing after download."
+            Write-Host "Expected: $sha256Url"
+            Write-ManualInstallHelp -GithubUrl $githubUrl -ApmRepo $apmRepo
+            exit 1
         }
     }
 
