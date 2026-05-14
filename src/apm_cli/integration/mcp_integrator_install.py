@@ -12,12 +12,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from apm_cli.core.null_logger import NullCommandLogger
+from apm_cli.utils.console import STATUS_SYMBOLS
 
 if TYPE_CHECKING:
     from apm_cli.core.scope import InstallScope
 
 
-def run_mcp_install(
+def run_mcp_install(  # noqa: PLR0915
     mcp_deps: list,
     runtime: str | None = None,
     exclude: str | None = None,
@@ -229,7 +230,7 @@ def run_mcp_install(
 
             if verbose:
                 if console:
-                    console.print("|  [cyan][i]  Runtime Detection[/cyan]")
+                    console.print(f"|  [cyan]{STATUS_SYMBOLS['info']}  Runtime Detection[/cyan]")
                     console.print(f"|     +- Installed: {', '.join(installed_runtimes)}")
                     console.print(f"|     +- Used in scripts: {', '.join(script_runtimes)}")
                     if target_runtimes:
@@ -376,7 +377,8 @@ def run_mcp_install(
                     if console:
                         for dep in already_configured_servers:
                             console.print(
-                                f"|  [green]+[/green] {dep} [dim](already configured)[/dim]"
+                                f"|  [green]{STATUS_SYMBOLS['check']}[/green] {dep} "
+                                f"[dim](already configured)[/dim]"
                             )
                     else:
                         logger.success("All registry MCP servers already configured")
@@ -385,7 +387,8 @@ def run_mcp_install(
                         if console:
                             for dep in already_configured_servers:
                                 console.print(
-                                    f"|  [green]+[/green] {dep} [dim](already configured)[/dim]"
+                                    f"|  [green]{STATUS_SYMBOLS['check']}[/green] {dep} "
+                                    f"[dim](already configured)[/dim]"
                                 )
                         else:
                             logger.verbose_detail(
@@ -419,12 +422,16 @@ def run_mcp_install(
                     # Install for each target runtime
                     for dep in servers_to_install:
                         is_update = dep in servers_to_update
+                        action_text = "Updating" if is_update else "Configuring"
                         if console:
-                            action_text = "Updating" if is_update else "Configuring"
-                            console.print(f"|  [cyan]>[/cyan]  {dep}")
+                            console.print(f"|  [cyan]{STATUS_SYMBOLS['running']}[/cyan]  {dep}")
                             console.print(
                                 f"|     +- {action_text} for "
                                 f"{', '.join([rt.title() for rt in target_runtimes])}..."
+                            )
+                        else:
+                            logger.progress(
+                                f"{dep}: {action_text.lower()} for {', '.join(target_runtimes)}..."
                             )
 
                         any_ok = False
@@ -447,7 +454,7 @@ def run_mcp_install(
                             if console:
                                 label = "updated" if is_update else "configured"
                                 console.print(
-                                    f"|  [green]+[/green]  {dep} -> "
+                                    f"|  [green]{STATUS_SYMBOLS['check']}[/green]  {dep} -> "
                                     f"{', '.join([rt.title() for rt in target_runtimes])}"
                                     f" [dim]({label})[/dim]"
                                 )
@@ -455,7 +462,12 @@ def run_mcp_install(
                             if is_update:
                                 successful_updates.add(dep)
                         elif console:
-                            console.print(f"|  [red]x[/red]  {dep}  -- failed for all runtimes")
+                            console.print(
+                                f"|  [red]{STATUS_SYMBOLS['cross']}[/red]  {dep}  "
+                                "-- failed for all runtimes"
+                            )
+                        else:
+                            logger.error(f"{dep} -- failed for all runtimes")
 
         except ImportError:
             logger.warning("Registry operations not available")
@@ -494,7 +506,10 @@ def run_mcp_install(
         if already_configured_self_defined:
             if console:
                 for name in already_configured_self_defined:
-                    console.print(f"|  [green]+[/green] {name} [dim](already configured)[/dim]")
+                    console.print(
+                        f"|  [green]{STATUS_SYMBOLS['check']}[/green] {name} "
+                        f"[dim](already configured)[/dim]"
+                    )
             else:
                 count = len(already_configured_self_defined)
                 logger.success(f"{count} self-defined server(s) already configured")
@@ -510,15 +525,20 @@ def run_mcp_install(
             self_defined_cache = {dep.name: synthetic_info}
             self_defined_env = dep.env or {}
 
+            transport_label = dep.transport or "stdio"
+            action_text = "Updating" if is_update else "Configuring"
             if console:
-                transport_label = dep.transport or "stdio"
-                action_text = "Updating" if is_update else "Configuring"
                 console.print(
-                    f"|  [cyan]>[/cyan]  {dep.name} [dim](self-defined, {transport_label})[/dim]"
+                    f"|  [cyan]{STATUS_SYMBOLS['running']}[/cyan]  {dep.name} "
+                    f"[dim](self-defined, {transport_label})[/dim]"
                 )
                 console.print(
                     f"|     +- {action_text} for "
                     f"{', '.join([rt.title() for rt in target_runtimes])}..."
+                )
+            else:
+                logger.progress(
+                    f"{dep.name}: {action_text.lower()} for {', '.join(target_runtimes)}..."
                 )
 
             any_ok = False
@@ -540,7 +560,7 @@ def run_mcp_install(
                 if console:
                     label = "updated" if is_update else "configured"
                     console.print(
-                        f"|  [green]+[/green]  {dep.name} -> "
+                        f"|  [green]{STATUS_SYMBOLS['check']}[/green]  {dep.name} -> "
                         f"{', '.join([rt.title() for rt in target_runtimes])}"
                         f" [dim]({label})[/dim]"
                     )
@@ -548,7 +568,12 @@ def run_mcp_install(
                 if is_update:
                     successful_updates.add(dep.name)
             elif console:
-                console.print(f"|  [red]x[/red]  {dep.name}  -- failed for all runtimes")
+                console.print(
+                    f"|  [red]{STATUS_SYMBOLS['cross']}[/red]  {dep.name}  "
+                    "-- failed for all runtimes"
+                )
+            else:
+                logger.error(f"{dep.name} -- failed for all runtimes")
 
     # Close the panel
     if console:
@@ -563,8 +588,10 @@ def run_mcp_install(
                 parts.append(f"configured {new_count} server{'s' if new_count != 1 else ''}")
             if update_count > 0:
                 parts.append(f"updated {update_count} server{'s' if update_count != 1 else ''}")
-            console.print(f"+- [green]{', '.join(parts).capitalize()}[/green]")
+            console.print(
+                f"[green]{STATUS_SYMBOLS['success']} {', '.join(parts).capitalize()}[/green]"
+            )
         else:
-            console.print("+- [green]All servers up to date[/green]")
+            console.print(f"[green]{STATUS_SYMBOLS['success']} All servers up to date[/green]")
 
     return configured_count
