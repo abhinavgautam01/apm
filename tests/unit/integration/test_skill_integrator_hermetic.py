@@ -68,6 +68,17 @@ def _make_target(
     mapping.deploy_root = deploy_root
     prim.__getitem__ = MagicMock(return_value=mapping)
     target.primitives = {"skills": mapping}
+
+    def _deploy_path(project_root: Path, *parts: str, primitive: str | None = None) -> Path:
+        if target.resolved_deploy_root is not None:
+            base = target.resolved_deploy_root
+        elif primitive == "skills":
+            base = project_root / (deploy_root or root_dir) / "skills"
+        else:
+            base = project_root / root_dir
+        return base.joinpath(*parts) if parts else base
+
+    target.deploy_path = _deploy_path
     return target
 
 
