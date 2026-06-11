@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unrelated config keys and refusing to overwrite a malformed file). `HERMES_HOME`
   overrides the Hermes home directory. See the [Hermes integration guide](https://microsoft.github.io/apm/integrations/hermes/).
 
+### Fixed
+
+- `apm install` now resolves relative `path:` deps declared by remote monorepo packages when they stay inside the same remote repo, while still rejecting absolute, escaping, or cross-repo paths; closes #1571. (#1732)
+
 ## [0.19.0] - 2026-06-09
 
 ### Added
