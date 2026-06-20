@@ -51,7 +51,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (by @sergio-sisternes-epam; closes #1848) (#1853)
 - Registry deps with non-semver version selectors (e.g. `stable`, `main`) no longer report perpetual `outdated`. The drift check now uses literal equality for non-semver registry pins rather than range comparison, which always returned `True` against a semver range. (#1816)
 - Non-semver registry version selectors are now exact-matched against the registry's published version list at install time. Previously they were rejected with "not a valid semver range". (#1816)
-
 - Cursor hook integration: emit required top-level `version: 1` in `.cursor/hooks.json`.
   Affected versions: v0.14.1-v0.20.0. Hooks were silently ignored by Cursor on those
   versions. Run `apm install` (or `apm install --target cursor`) to repair existing
